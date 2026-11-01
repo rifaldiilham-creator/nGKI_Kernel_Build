@@ -1,0 +1,128 @@
+name: Build POCO M5s / Redmi Note 10S (rosemary)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-rosemary.yml'
+
+env:
+  DEVICE_NAME: "rosemary"
+  DEVICE_CODENAME: "rosemary"
+
+  CUSTOM_CMDS: "CLANG_TRIPLE=aarch64-linux-gnu-"
+  EXTRA_CMDS: "LD=ld.lld LLVM=1 LLVM_IAS=1"
+
+  KERNEL_SOURCE: "https://github.com/LineageOS/android_kernel_xiaomi_mt6785.git"
+  KERNEL_BRANCH: "lineage-21"
+
+  CLANG_SOURCE: "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/LLVM-19.1.7-Linux-X64.tar.xz"
+  CLANG_BRANCH: ""
+
+  GCC_GNU: false
+  GCC_64_SOURCE: "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9.git"
+  GCC_64_BRANCH: "android12L-release"
+  GCC_32_SOURCE: "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9.git"
+  GCC_32_BRANCH: "android12L-release"
+
+  DEFCONFIG_SOURCE: ""
+  DEFCONFIG_NAME: "rosemary_defconfig"
+  DEFCONFIG_ORIGIN_IMAGE: ""
+  DEFCONFIG_FROM_BOOT: false
+
+  KERNELSU_SOURCE: ""
+  KERNELSU_BRANCH: ""
+  KERNELSU_AUTO_GET: "true"
+  KERNELSU_AUTO_FORK: "sukisu"
+  KERNELSU_METHOD: "shell"
+
+  SUSFS_ENABLE: false
+  SUSFS_FIXED: false
+
+  AK3_SOURCE: "https://github.com/osm0sis/AnyKernel3.git"
+  AK3_BRANCH: "master"
+  PACK_METHOD: "AnyKernel3"
+  PACK_KMODULES: "false"
+
+  # Kernel Makefile builds rosemary.dtbo as part of `dtbs`.
+  # Framework's Generate DTBO step then packs it into dtbo.img.
+  NEED_DTBO: true
+  NEED_SAFE_DTBO: false
+  HAVE_NO_DTBO: "true"
+  HAVE_NO_DTBO_TOOL: "true"
+  GENERATE_DTB: "false"
+  GENERATE_CHIP: "mediatek"
+  CUSTOM_DTB: "false"
+  DTB_NAME: "rosemary"
+
+  BOOT_SOURCE: ""
+  ROM_TEXT: "lineageos_21"
+  PYTHON_VERSION: "3"
+
+  PATCHES_SOURCE: ""
+  PATCHES_BRANCH: ""
+  SUSFS_FOLDER_FIXED: ""
+  SUSFS_PATCH_FIXED: ""
+
+  REKERNEL_ENABLE: "false"
+  DROIDSPACES_ENABLE: "false"
+  NOMOUNT_ENABLE: "false"
+  HOOK_METHOD: "syscall"
+
+  KPM_ENABLE: "false"
+  KPM_INLINE: "false"
+  KPM_KPATCH_NEXT: "false"
+  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux"
+
+  BASEBAND_GUARD_ENABLE: "false"
+  BASEBAND_GUARD_BOOT: "false"
+  BUILD_DEBUGGER: "true"
+  SKIP_PATCH: "false"
+  BUILD_OTHER_CONFIG: "false"
+  MERGE_CONFIG_FILES: ""
+  FREE_MORE_SPACE: "false"
+
+jobs:
+  build-kernel:
+    name: Build rosemary kernel
+    runs-on: ubuntu-24.04
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_HARDLINK: "true"
+
+    steps:
+      - name: Checkout build framework
+        uses: actions/checkout@v4
+
+      - name: Prepare build environment
+        uses: ./.github/workflows/build-env
+
+      - name: Prepare kernel source and SukiSU Ultra
+        uses: ./.github/workflows/build-ready
+
+      - name: Build kernel and DTBO
+        uses: ./.github/workflows/build-process
+
+      - name: Verify build outputs
+        shell: bash
+        run: |
+          set -e
+          BOOT_DIR="$GITHUB_WORKSPACE/device_kernel/out/arch/arm64/boot"
+          test -s "$BOOT_DIR/Image.gz"
+          test -s "$BOOT_DIR/dts/mediatek/rosemary.dtbo"
+          test -s "$BOOT_DIR/dtbo.img"
+          echo "Image.gz, rosemary.dtbo, and dtbo.img are present."
+          echo "--- Output sizes ---"
+          ls -lh "$BOOT_DIR/Image.gz" "$BOOT_DIR/dts/mediatek/rosemary.dtbo" "$BOOT_DIR/dtbo.img"
+
+      - name: Upload raw build artifacts (not flashable ZIP)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rosemary-lineage21-kernel-${{ github.run_number }}
+          if-no-files-found: error
+          path: |
+            device_kernel/out/arch/arm64/boot/Image.gz
+            device_kernel/out/arch/arm64/boot/dts/mediatek/rosemary.dtbo
+            device_kernel/out/arch/arm64/boot/dtbo.img
+            device_kernel/out/.config
