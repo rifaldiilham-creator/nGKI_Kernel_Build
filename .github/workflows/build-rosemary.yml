@@ -101,6 +101,10 @@ jobs:
       - name: Prepare kernel source and SukiSU Ultra
         uses: ./.github/workflows/build-ready
 
+      - name: Apply SukiSU compatibility patch
+        shell: bash
+        run: bash "$GITHUB_WORKSPACE/patches/sukisu/kernel-4.14-compat.sh"
+
       - name: Build kernel and DTBO
         uses: ./.github/workflows/build-process
 
